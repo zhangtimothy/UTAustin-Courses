@@ -37,7 +37,7 @@ class TLSSession:
 
         self.mac_key_size = 20
         self.enc_key_size = 16
-        #self.iv_size = 16
+        self.iv_size = 16
 
         self.handshake = True
 
@@ -66,7 +66,9 @@ class TLSSession:
         1. set client_time, client_bytes
         2. calculate client_random. There is a method for this
         """
-        pass
+        self.client_time = time_part
+        self.client_bytes = random_part
+        self.client_random = self.time_and_random(time_part, random_part)
 
     def set_server_random(self):
         # STUDENT TODO
@@ -74,7 +76,12 @@ class TLSSession:
         1. set server_time, server_bytes
         2. calculate server_random. There is a method for this
         """
-        pass
+        self.server_time = self.client_time
+        # Debug.print("after randstring")
+
+        self.server_random = self.time_and_random(self.server_time)
+        self.server_random_bytes = self.server_random[4:]
+        self.server_bytes = randstring(32)
 
     def set_server_rsa_privkey(self, rsa_privkey):
         self.server_rsa_privkey = rsa_privkey
@@ -97,14 +104,26 @@ class TLSSession:
         3. calculate a key block
         4. split the key block into read and write keys for enc and mac
         """
-        pass
+        self.pre_master_secret = self.server_dh_privkey.exchange(self.client_dh_pubkey)
+        pms = self.pre_master_secret
+        cr = self.client_random
+        sr = self.server_random
+        self.master_secret = self.PRF.compute_master_secret(pms, cr, sr)
+        kb = self.PRF.derive_key_block(self.master_secret, sr, cr, self.key_block_len)
+        mac_size = self.mac_key_size
+        enc_size = self.enc_key_size
+        self.read_mac = kb[0:mac_size]
+        self.write_mac = kb[mac_size:2*mac_size]
+        self.read_enc = kb[2*mac_size:2*mac_size + enc_size]
+        self.write_enc = kb[2*mac_size + enc_size:2*mac_size + 2*enc_size]
 
     def tls_sign(self, bytes):
         """
         1. Create a TLSSignature object. set sig_alg to 0x0401
         2. use this object to sign the bytes
         """
-        sig = None # this should be the signature object
+        sig = _TLSSignature(sig_alg=0x0401)
+        sig._update_sig(bytes, self.server_rsa_privkey)
         return sig
 
 
@@ -124,7 +143,12 @@ class TLSSession:
         5. return ONLY the decrypted plaintext data
         6. NOTE: When you do the HMAC, don't forget to re-create the header with the plaintext len!
         """
-        plaintext = b''
+        iv = tls_pkt_bytes[5:self.iv_size+5]
+        cipher = Cipher(algorithms.AES(self.read_enc), modes.CBC(iv), default_backend())
+        decryptor = cipher.decryptor()
+        plaintext = decryptor.update(tls_pkt_bytes[5 + self.iv_size:]) + decryptor.finalize()
+        # do i need to remove the padding at end?
+        plaintext = plaintext[: -20 - plaintext[-1] - 1]
         return plaintext
 
     def encrypt_tls_pkt(self, tls_pkt, test_iv=None):
@@ -150,7 +174,25 @@ class TLSSession:
         6. return the iv + encrypted data
         """
         
-        ciphertext = b""
+        plaintext = struct.pack("!Q", self.write_seq_num)
+        self.write_seq_num += 1
+        prefix = struct.pack("!B", tls_pkt_bytes[0]) + tls_pkt_bytes[1:3]
+        plaintext += prefix
+        plaintext += struct.pack("!H", len(plaintext_bytes)) + plaintext_bytes
+        iv = randstring(16)
+        cipher = Cipher(algorithms.AES(self.write_enc), modes.CBC(iv), default_backend())
+        encryptor = cipher.encryptor()
+        hmac = crypto_hmac.HMAC(self.write_mac, hashes.SHA1(), default_backend())
+        hmac.update(plaintext)
+        hmac = hmac.finalize()
+        padding = self.iv_size - 1
+        padding -= (len(plaintext_bytes) + len(hmac)) % self.iv_size
+        padding = struct.pack("!B", padding) * padding
+        msg_with_padding = plaintext_bytes + hmac + padding + struct.pack("!B", len(padding))
+        ciphertext = encryptor.update(msg_with_padding) + encryptor.finalize()
+        ciphertext = struct.pack("!H", len(iv + ciphertext)) + iv + ciphertext
+        ciphertext = prefix + ciphertext
+        return ciphertext
         
         return ciphertext
 
@@ -166,7 +208,7 @@ class TLSSession:
             arg_3: all the handshake messages so far
             arg_4: the master secret
         """
-        verify_data = b""
+        verify_data = self.PRF.compute_verify_data("server", mode, self.handshake_messages, self.master_secret)
         
         return verify_data
 

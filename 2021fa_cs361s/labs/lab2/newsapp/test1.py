@@ -394,7 +394,7 @@ class ViewsTestCase(TestCase):
         self.assertTrue(str(render.content).count("bcd") == 0)
         self.assertTrue(str(render.content).count("cde") == 0)
         self.assertTrue(str(render.content).count(hi_source_key) == 1)
-        
+
         #test rookie update
         request_post_update_lo.user = rookie
         render = user_account(request_post_update_lo)

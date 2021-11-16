@@ -80,10 +80,28 @@ class TLS_Visibility:
         6. store in the provided server_hello, server_cert, server_key_exchange,
             and server_hello_done variables
         """
+        cipher = TLS_DHE_RSA_WITH_AES_128_CBC_SHA.val
+        self.session.set_client_random(tls_msg.gmt_unix_time, tls_msg.random_bytes)
+        self.session.set_server_random()
+        # Debug.print("1")
+        server_hello_done = TLSServerHelloDone()
+        # Debug.print("2")
+        t = tls_msg.gmt_unix_time
+        v = tls_msg.version
+        # Debug.print("3")
+        server_hello = TLSServerHello(gmt_unix_time=t, random_bytes=self.session.server_random_bytes, version=v, cipher=cipher)
+        server_cert = TLSCertificate(certs=[self.cert])
+        s = _TLSSignature(sig_alg=0x0401)
+        s._update_sig(self.session.client_random + self.session.server_random + raw(self.session.server_dh_params), self.session.server_rsa_privkey)
+        server_key_exchange = TLSServerKeyExchange(params=self.session.server_dh_params, sig=s)
+
         f_session = tlsSession()
         f_session.tls_version = 0x303
-        tls_response = TLS(msg=[server_hello, server_cert, server_key_exchange, server_hello_done],
-            tls_session=f_session)
+        msg = [server_hello, server_cert, server_key_exchange, server_hello_done]
+        self.session.record_handshake_message(raw(tls_msg))
+        for s in msg:
+            self.session.record_handshake_message(raw(s))
+        tls_response = TLS(msg=msg, tls_session=f_session)
         tls_response_bytes = raw(tls_response)
         Debug.print_packet(tls_response)
         return tls_response_bytes
@@ -96,6 +114,9 @@ class TLS_Visibility:
         1. process the client key exchange by extracting the "exchkeys"
         2. These can be passed directly to session.set_client_dh_params
         """ 
+        self.session.record_handshake_message(raw(tls_msg))
+        exchkeys = tls_msg.exchkeys
+        self.session.set_client_dh_params(ClientDiffieHellmanPublic(bytes(exchkeys)))
         return b'' # (No response necessary)
             
     def process_tls_handshake_finished(self, tls_msg):    
@@ -123,6 +144,10 @@ class TLS_Visibility:
         """
         
 
+        self.session.record_handshake_message(raw(tls_msg))
+        server_change_cipher_spec = TLSChangeCipherSpec()
+        server_finished = TLSFinished(vdata=self.session.compute_handshake_verify("write"), tls_session=f_session)
+        
         self.session.handshake = False
 
         change_cipher_msg = TLS(msg=[server_change_cipher_spec])
@@ -131,7 +156,7 @@ class TLS_Visibility:
         server_finished_msg = TLS(msg=[server_finished], tls_session=f_session)
         Debug.print_packet(server_finished_msg)
         server_finished_msg.type = 22 # This is probably not necessary any more.
-        
+        encrypted_finished_msg = self.session.encrypt_tls_pkt(server_finished_msg)
         
         return raw(change_cipher_msg) + encrypted_finished_msg
         
@@ -142,8 +167,7 @@ class TLS_Visibility:
         2. decrypt the packet to plaintext_data. You should already have a method for this
         3. store in plaintext
         """
-        plaintext = b""
-        
+        plaintext = self.session.decrypt_tls_pkt(tls_pkt, is_handshake=True)
         
         Debug.print("attempt to cast to TLS Finished")
         f_session = tlsSession()
@@ -213,6 +237,7 @@ class TLS_Visibility:
                 2. decrypt the packet to application_data. You should already have a method for this.
                 3. store in application_data
                 """
+                application_data = self.session.decrypt_tls_pkt(tls_pkt)
                 application_pkt = TLSApplicationData(application_data)
                 Debug.print("Got {} bytes of decrypted data".format(len(application_pkt.data)))
                 output += application_pkt.data

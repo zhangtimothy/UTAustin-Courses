@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: 2021sp-cs361s-lab3
+Version: 0.0.1
+Summary: CS 361S Lab 3
+Home-page: https://github.com/CrimsonVista/UTAustin-Courses/2021sp_cs361s/labs/lab3
+Author: Seth Nielson
+Author-email: seth@crimsonvista.com
+License: UNKNOWN
+Description: 
+        This is a TLS front-end for two kinds of proxying. The first
+        is proxying to a non TLS server. So, e.g., an HTTP server that wasn't
+        built with TLS support.
+        
+        The second is a SOCKS proxy that can transparently proxy both 
+        HTTP and HTTPS.
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown

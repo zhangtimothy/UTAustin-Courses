@@ -41,7 +41,34 @@ class TLSHTTPProxy(asyncio.Protocol):
         
         Return the certificate and associated private key.
         """
-        return host_cert, host_key
+        one_day = timedelta(1, 0, 0)
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_key = private_key.public_key()
+        builder = x509.CertificateBuilder()
+        builder = builder.subject_name(x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, host),
+            ]))
+        # builder = builder.issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, self.root_cert),]))
+        builder = builder.issuer_name(self.root_cert.subject)
+
+        builder = builder.not_valid_before(datetime.today() - one_day)
+        builder = builder.not_valid_after(datetime.today() + (one_day * 30))
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.public_key(public_key)
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName(
+                [x509.DNSName(host)]
+            ),
+            critical=False
+        )
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None), critical=True,
+        )
+        host_cert = builder.sign(
+            private_key=self.root_key, algorithm=hashes.SHA256(),
+        )
+        host_key = private_key
+        return (host_cert, host_key)
         
     def connection_made(self, transport):
         peername = transport.get_extra_info('peername')
