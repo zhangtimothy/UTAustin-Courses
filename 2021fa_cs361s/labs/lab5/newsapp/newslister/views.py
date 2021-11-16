@@ -173,8 +173,8 @@ def register_view(request):
             return render(request, 'registration/register.html', {'form':form})
 
 # Configuration
-GOOGLE_CLIENT_ID = "" #STUDENT TODO
-GOOGLE_CLIENT_SECRET = "" #STUDENT TODO
+GOOGLE_CLIENT_ID = "307250652973-guapk7hqmc1iqva1o79tu45uk1405tvi.apps.googleusercontent.com" #STUDENT TODO
+GOOGLE_CLIENT_SECRET = "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" #STUDENT TODO
 GOOGLE_DISCOVERY_URL = ("https://accounts.google.com/.well-known/openid-configuration")
 
 # OAuth 2 client setup
@@ -192,7 +192,7 @@ def oauth_view(request):
     # Generate an anti-forgery state token with length 30 (variable)
     # Use the random_key() function
     #STUDENT TODO : START
-
+    state_token = random_key(30)
     #STUDENT TODO : END
 
     # Create the authorization request uri
@@ -203,7 +203,10 @@ def oauth_view(request):
     # Assign the returned value to request_uri
     request_uri = None
     #STUDENT TODO : START
-    
+    uri = request_uri # unsure
+    redirect_uri = request.build_absolute_uri() + "callback"
+    scope = ["openid", "email", "profile"]
+    request_uri = client.prepare_authorization_request_uri(uri, redirect_uri, scope, state_token)
     #STUDENT TODO : END
 
     return redirect(request_uri)
