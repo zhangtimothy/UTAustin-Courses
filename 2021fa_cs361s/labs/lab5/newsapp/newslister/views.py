@@ -184,7 +184,7 @@ def get_google_provider_cfg():
     return requests.get(GOOGLE_DISCOVERY_URL).json()
 
 def oauth_view(request):
-
+    global state_token
     # Find out what URL to hit for Google login
     google_provider_cfg = get_google_provider_cfg()
     authorization_endpoint = google_provider_cfg["authorization_endpoint"]
@@ -212,21 +212,22 @@ def oauth_view(request):
     return redirect(request_uri)
 
 def oauth_callback_view(request):
-
+    global state_token
     # Get the anti-forgery state token from the callback
     # and compare with the token already generated
     # Raise an error if their is a mismatch
     # Hint : Check request.GET to get parameters of the GET request
     #        Take a look at the "state" key of the dictionary
     #STUDENT TODO : START 
-    
+    if state_token != request.GET['state']:
+        raise Exception('not match in views.py oauth callback view')
     #STUDENT TODO : END
 
     # Get authorization code Google sent back to you
     # Hint : Check request.GET to get parameters of the GET request
     #        Take a look at the "code" key of the dictionary
     #STUDENT TODO : START
-    
+    auth_code = request.GET['code']
     #STUDENT TODO : END
 
     # Find out what URL to hit to get tokens that allow you to ask for
@@ -243,14 +244,15 @@ def oauth_callback_view(request):
     # Populate the response of the post request in token_response
     token_response = None
     #STUDENT TODO : START
-    
+    token_url, FORM_ENC_HEADERS, body = client.prepare_token_request(token_endpoint, auth_code)
+    token_response = requests.post(token_url, headers=FORM_ENC_HEADERS, data=body, auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET))
     #STUDENT TODO : END
 
     # Parse the tokens!
     # Use client.parse_request_body_response() function
     # The argument would be json.dumps(token_response.json())
     #STUDENT TODO : START
-    
+    client.parse_request_body_response(json.dumps(token_response.json()))
     #STUDENT TODO : END
 
     # Now that you have tokens (yay) let's find the URL
@@ -263,7 +265,8 @@ def oauth_callback_view(request):
     # Store the response of the GET request in a variable, userinfo_response
     userinfo_response = None
     #STUDENT TODO : START
-    
+    headers = client.add_token()
+    userinfo_response = requests.get(userinfo_endpoint, headers=headers)
     #STUDENT TODO : END
 
     # You want to make sure their email is verified.
@@ -273,7 +276,10 @@ def oauth_callback_view(request):
     # Check the email_verified, email and given_name parameters
     # and store that information to create/retrieve an entry in your database
     #STUDENT TODO : START
-    
+    userinfo_response_dict = json.loads(userinfo_response.json())
+    email_verified = userinfo_response_dict['email_verified']
+    email = userinfo_response_dict['email']
+    given_name = userinfo_response_dict['given_name']
     #STUDENT TODO : END
 
     # Check if the user with the given username already exists in the 
@@ -291,7 +297,13 @@ def oauth_callback_view(request):
     user = None
     userxtraauth = None
     #STUDENT TODO : START
-    
+    if UserXtraAuth.objects.filter(username = given_name).exists():
+        userxtraauth = UserXtraAuth.objects.get(username = given_name)
+        user = User.objects.get(username = given_name)
+    else:
+        userxtraauth = UserXtraAuth.save()
+        user = User.objects.create_user(given_name, email)
+
     #STUDENT TODO : END
 
     # Begin user session by logging the user in
