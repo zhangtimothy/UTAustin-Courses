@@ -36,7 +36,19 @@ class OAuthClient:
 		params = [(('response_type', 'code')),
 		      	  (('client_id', self.client_id))]
 		#STUDENT TODO : START
-		
+		params.extend( [(('redirect_uri', redirect_uri)), (('scope', scope)), (('state', state_token))] )
+		self.redirect_uri = redirect_uri
+		self.scope = scope
+		self.state_token = state_token
+		url_parsed_obj = urlparse.urlparse(uri)
+		query = url_parsed_obj.query
+		self.expires_at = self.expires_in + time.time()
+		sch = url_parsed_obj.scheme
+		net = url_parsed_obj.netloc
+		path = url_parsed_obj.path
+		par = url_parsed_obj.params
+		fra = url_parsed_obj.fragment
+		query = add_params_to_qs(query, params)
 		#STUDENT TODO : END
 		return urlparse.urlunparse((sch, net, path, par, query, fra))
 
@@ -53,7 +65,11 @@ class OAuthClient:
 	        #    See the unpopulated variables in the __init__ function.
 		params = [('grant_type', self.grant_type)]
 		#STUDENT TODO : START
-		
+		params.extend( [('redirect_uri', self.redirect_uri), ('code', code)] )
+		self.code = code
+		self.access_token = token_url
+		body = add_params_to_qs('', params)
+
 		#STUDENT TODO : END
 		return token_url, FORM_ENC_HEADERS, body
 
@@ -66,7 +82,29 @@ class OAuthClient:
 		# IF-ELSE statements to check the existence of the keys
 		params = {}
 		#STUDENT TODO : START
-		
+		params = json.loads(body)
+		if 'client_id' in params:
+			self.client_id = params['client_id']
+		if 'grant_type' in params:
+			self.grant_type = params['grant_type']
+		if 'redirect_uri' in params:
+			self.redirect_uri = params['redirect_uri']
+		if 'scope' in params:
+			self.scope = params['scope']
+		if 'state_token' in params:
+			self.state_token = params['state_token']
+		if 'code' in params:
+			self.code = params['code']
+		if 'expires_in' in params:
+			self.expires_in = params['expires_in']
+			self.expires_at = self.expires_in + time.time()
+		if 'expires_at' in params:
+			self.expires_at = params['expires_at']
+		if 'access_token' in params:
+			self.access_token = params['access_token']
+		if 'token_type' in params:
+			self.token_type = params['token_type']
+
 		#STUDENT TODO : END
 		return params
 
@@ -78,7 +116,7 @@ class OAuthClient:
 		# of the token type of the access token, along with the access token
 		headers = {}
 		#STUDENT TODO : START
-
+		headers['Authorization'] = self.token_type + self.access_token
 		#STUDENT TODO : END
 
 		return headers
