@@ -220,7 +220,7 @@ def oauth_callback_view(request):
     #        Take a look at the "state" key of the dictionary
     #STUDENT TODO : START 
     if state_token != request.GET['state']:
-        raise Exception('not match in views.py oauth callback view')
+        raise BadRequest('not match in views.py oauth callback view')
     #STUDENT TODO : END
 
     # Get authorization code Google sent back to you
@@ -278,6 +278,8 @@ def oauth_callback_view(request):
     #STUDENT TODO : START
     userinfo_response_dict = json.loads(userinfo_response.json())
     email_verified = userinfo_response_dict['email_verified']
+    if not email_verified:
+        raise BadRequest('not email verified')
     email = userinfo_response_dict['email']
     given_name = userinfo_response_dict['given_name']
     #STUDENT TODO : END
