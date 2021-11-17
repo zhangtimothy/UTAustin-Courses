@@ -203,7 +203,7 @@ def oauth_view(request):
     # Assign the returned value to request_uri
     request_uri = None
     #STUDENT TODO : START
-    uri = request_uri # unsure
+    uri = authorization_endpoint # unsure
     redirect_uri = request.build_absolute_uri() + "callback"
     scope = ["openid", "email", "profile"]
     request_uri = client.prepare_authorization_request_uri(uri, redirect_uri, scope, state_token)
@@ -276,7 +276,8 @@ def oauth_callback_view(request):
     # Check the email_verified, email and given_name parameters
     # and store that information to create/retrieve an entry in your database
     #STUDENT TODO : START
-    userinfo_response_dict = json.loads(userinfo_response.json())
+    # userinfo_response_dict = json.loads(userinfo_response.json())
+    userinfo_response_dict = userinfo_response.json()
     email_verified = userinfo_response_dict['email_verified']
     if not email_verified:
         raise BadRequest('not email verified')
@@ -303,7 +304,8 @@ def oauth_callback_view(request):
         userxtraauth = UserXtraAuth.objects.get(username = given_name)
         user = User.objects.get(username = given_name)
     else:
-        userxtraauth = UserXtraAuth.save()
+        userxtraauth = UserXtraAuth(username=given_name, secrecy=5, tokenkey=client.access_token)
+        userxtraauth.save()
         user = User.objects.create_user(given_name, email)
 
     #STUDENT TODO : END

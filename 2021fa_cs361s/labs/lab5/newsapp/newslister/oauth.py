@@ -36,18 +36,12 @@ class OAuthClient:
 		params = [(('response_type', 'code')),
 		      	  (('client_id', self.client_id))]
 		#STUDENT TODO : START
-		params.extend( [(('redirect_uri', redirect_uri)), (('scope', scope)), (('state', state_token))] )
+		params.extend( [(('redirect_uri', redirect_uri)), (('scope', list_to_scope(scope))), (('state', state_token))] )
 		self.redirect_uri = redirect_uri
 		self.scope = scope
 		self.state_token = state_token
-		url_parsed_obj = urlparse.urlparse(uri)
-		query = url_parsed_obj.query
-		self.expires_at = self.expires_in + time.time()
-		sch = url_parsed_obj.scheme
-		net = url_parsed_obj.netloc
-		path = url_parsed_obj.path
-		par = url_parsed_obj.params
-		fra = url_parsed_obj.fragment
+		sch, net, path, par, query, fra = urlparse.urlparse(uri)
+		# self.expires_at = self.expires_in + time.time()
 		query = add_params_to_qs(query, params)
 		#STUDENT TODO : END
 		return urlparse.urlunparse((sch, net, path, par, query, fra))
